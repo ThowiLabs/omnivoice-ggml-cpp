@@ -13,3 +13,8 @@ models/
 *.ogg
 
 .DS_Store
+
+# Local validation/packaging only
+build-cpu/
+dist/
+__pycache__/
