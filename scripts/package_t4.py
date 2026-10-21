@@ -5,9 +5,12 @@ No weights, user dataset contents, tokens or git data are ever included.
 from pathlib import Path
 import hashlib, json, os, shutil, tarfile, tempfile
 ROOT=Path(__file__).resolve().parent.parent
-DIST=ROOT/'dist'
+DIST=ROOT/os.environ.get('OMNIVOICE_DIST_DIR','dist')
 DIST.mkdir(exist_ok=True)
-BIN=ROOT/'build'
+BIN=ROOT/os.environ.get('OMNIVOICE_BUILD_DIR','build')
+SUFFIX=os.environ.get('OMNIVOICE_PACKAGE_SUFFIX','')
+if SUFFIX and (len(SUFFIX)>45 or any(c not in '-_.abcdefghijklmnopqrstuvwxyz0123456789' for c in SUFFIX)):
+    raise ValueError('Invalid package suffix')
 LIB_FILES={
     'libomnivoice_ggml_cpp.so':BIN/'libomnivoice_ggml_cpp.so',
     'libggml-base.so.0.9.11':BIN/'ggml/src/libggml-base.so.0.9.11',
@@ -16,7 +19,7 @@ LIB_FILES={
     'libggml-cuda.so.0.9.11':BIN/'ggml/src/ggml-cuda/libggml-cuda.so.0.9.11',
 }
 SOURCES=('CMakeLists.txt','README.md','README-THOWI.md','LICENSE','NOTICE',
-         'THIRD_PARTY_NOTICES.md','src','include','vendor','patches','docs','scripts', '.gitmodules')
+         'THIRD_PARTY_NOTICES.md','src','include','vendor','patches','docs','scripts','tests', '.gitmodules')
 def sha(path):
     h=hashlib.sha256()
     with path.open('rb') as src:
@@ -62,11 +65,11 @@ exec "$HERE/bin/omnivoice-cli" "$@"
         'Voice cloning: add --ref-audio sample.wav --ref-text "transcript".\n'
         'Built with -DGGML_CUDA_NO_VMM=ON -DCMAKE_CUDA_ARCHITECTURES=75.\n'
         'Weights licensed separately. Reference: https://github.com/bluryar/omnivoice.cpp\n')
-    out=DIST/'bluryar-omnivoice-cuda-sm75-linux-x86_64.tar.gz'
+    out=DIST/('bluryar-omnivoice-cuda-sm75-linux-x86_64'+SUFFIX+'.tar.gz')
     with tarfile.open(out,'w:gz',compresslevel=6) as tar:
         tar.add(stage,arcname=stage.name,filter=safe_tar_filter)
     print('BIN_ARCHIVE',out.name,out.stat().st_size,sha(out),flush=True)
-    src_out=DIST/'bluryar-omnivoice-full-source.tar.gz'
+    src_out=DIST/('bluryar-omnivoice-full-source'+SUFFIX+'.tar.gz')
     with tarfile.open(src_out,'w:gz',compresslevel=6) as tar:
         for entry in SOURCES:
             p=ROOT/entry
