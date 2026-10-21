@@ -126,7 +126,7 @@ uint32_t last_codepoint(const std::string & text) {
 
 } // namespace
 
-std::vector<float> remove_silence(const std::vector<float> & audio, int sample_rate, int mid_sil_ms, int lead_sil_ms, int trail_sil_ms) {
+std::vector<float> remove_silence(const std::vector<float> & audio, int sample_rate, int mid_sil_ms, int lead_sil_ms, int trail_sil_ms, bool preserve_active_edges) {
     std::vector<float> cur = audio;
     if (mid_sil_ms > 0) {
         auto segs = active_segments(cur, sample_rate, -50.0f);
@@ -135,6 +135,16 @@ std::vector<float> remove_silence(const std::vector<float> & audio, int sample_r
         std::vector<std::pair<int, int>> expanded;
         for (auto [s, e] : segs) {
             expanded.push_back({std::max(0, s - keep), std::min<int>(cur.size(), e + keep)});
+        }
+        if (preserve_active_edges && !expanded.empty()) {
+            // Preserve weak nonzero consonant/sibilant tails rejected by the
+            // dB threshold. Never apply this at boundaries between chunks.
+            auto first = std::find_if(cur.begin(), cur.end(), [](float v) { return v != 0.0f; });
+            auto last = std::find_if(cur.rbegin(), cur.rend(), [](float v) { return v != 0.0f; });
+            if (first != cur.end()) expanded.front().first = std::min(
+                expanded.front().first, int(std::distance(cur.begin(), first)));
+            if (last != cur.rend()) expanded.back().second = std::max(
+                expanded.back().second, int(cur.size() - std::distance(cur.rbegin(), last)));
         }
         std::vector<std::pair<int, int>> merged;
         for (auto seg : expanded) {
@@ -148,14 +158,23 @@ std::vector<float> remove_silence(const std::vector<float> & audio, int sample_r
         for (auto [s, e] : merged) kept.insert(kept.end(), cur.begin() + s, cur.begin() + e);
         cur.swap(kept);
     }
-    return trim_edges(cur, sample_rate, lead_sil_ms, trail_sil_ms, -50.0f);
+    auto trimmed = trim_edges(cur, sample_rate, lead_sil_ms, trail_sil_ms, -50.0f);
+    if (!preserve_active_edges || trimmed.empty()) return trimmed;
+    // End trimming must not remove weak nonzero samples; the float signal
+    // remains lossless up to the final WAV/MP3 encoder.
+    return cur;
 }
 
-std::vector<float> fade_and_pad_audio(const std::vector<float> & audio, int sample_rate) {
+std::vector<float> fade_and_pad_audio(const std::vector<float> & audio, int sample_rate,
+                                      float fade_duration, float pad_duration) {
     if (audio.empty()) return audio;
+    if (!std::isfinite(fade_duration) || !std::isfinite(pad_duration) ||
+        fade_duration < 0.0f || fade_duration > 5.0f ||
+        pad_duration < 0.0f || pad_duration > 5.0f)
+        throw std::invalid_argument("fade_duration/pad_duration must be finite, 0..5 seconds");
     std::vector<float> out = audio;
-    const int fade = int(0.1f * sample_rate);
-    const int pad = int(0.1f * sample_rate);
+    const int fade = int(fade_duration * sample_rate);
+    const int pad = int(pad_duration * sample_rate);
     const int k = std::min<int>(fade, out.size() / 2);
     for (int i = 0; i < k; ++i) {
         const float fi = k <= 1 ? 1.0f : float(i) / float(k - 1);
@@ -204,6 +223,36 @@ std::vector<float> resample_linear(const std::vector<float> & input, int src_rat
         const size_t k = std::min<size_t>(input.size() - 1, j + 1);
         const float t = float(src - double(j));
         out[i] = input[j] * (1.0f - t) + input[k] * t;
+    }
+    return out;
+}
+
+std::string normalize_terminal_punctuation_spacing(const std::string & text) {
+    // Reproduces Hangry Labs' Python tokenizer workaround: ASCII '?'/'!'
+    // at word-ending boundaries get one preceding space, excluding CJK.
+    auto is_cjk = [](uint32_t cp) {
+        return (cp >= 0x3400 && cp <= 0x4dbf) || (cp >= 0x4e00 && cp <= 0x9fff) ||
+               (cp >= 0x3040 && cp <= 0x30ff) || (cp >= 0xac00 && cp <= 0xd7af);
+    };
+    std::string out;
+    for (size_t i = 0; i < text.size();) {
+        if (text[i] != '?' && text[i] != '!') {
+            auto pos = i;
+            (void)utf8_decode_one_local(text, &pos);
+            out.append(text, i, pos - i);
+            i = pos;
+            continue;
+        }
+        size_t next = i;
+        while (next < text.size() && (text[next] == '?' || text[next] == '!')) ++next;
+        const bool final_boundary = next == text.size() ||
+            std::isspace(static_cast<unsigned char>(text[next]));
+        const uint32_t last = out.empty() ? 0 : last_codepoint(out);
+        const bool attached = last != 0 && !is_cjk(last) &&
+            !(last <= 0x7f && std::isspace(static_cast<unsigned char>(last)));
+        if (final_boundary && attached) out.push_back(' ');
+        out.append(text, i, next - i);
+        i = next;
     }
     return out;
 }

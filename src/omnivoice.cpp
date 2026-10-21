@@ -1423,18 +1423,20 @@ Audio OmniVoiceRuntime::generate(const SynthesisParams & params) {
     if (params.ref_audio_path.empty() && instruct.empty() && !params.auto_voice) instruct = "male, British accent";
     const std::string lang = resolve_language(params.language);
     instruct = resolve_instruct(instruct, contains_cjk(params.text));
+    const std::string target_text = config.normalize_terminal_punctuation
+        ? normalize_terminal_punctuation_spacing(params.text) : params.text;
     std::vector<std::string> chunk_texts;
     std::vector<int> chunk_targets;
     {
         ScopedStage stage(model, "planning", "generation_plan");
-        const int target = estimate_target_tokens(model, params.text, params.speed, params.duration, has_prompt ? &prompt : nullptr);
+        const int target = estimate_target_tokens(model, target_text, params.speed, params.duration, has_prompt ? &prompt : nullptr);
         const int threshold = int(config.audio_chunk_threshold * model.higgs.frame_rate());
         if (target > threshold && config.audio_chunk_duration > 0.0f) {
-            const float avg = float(target) / float(std::max(1, utf8_length(params.text)));
+            const float avg = float(target) / float(std::max(1, utf8_length(target_text)));
             const int chunk_len = std::max(1, int(config.audio_chunk_duration * model.higgs.frame_rate() / std::max(avg, 1.0e-6f)));
-            chunk_texts = chunk_text_punctuation(params.text, chunk_len, 3);
+            chunk_texts = chunk_text_punctuation(target_text, chunk_len, 3);
         }
-        if (chunk_texts.empty()) chunk_texts.push_back(params.text);
+        if (chunk_texts.empty()) chunk_texts.push_back(target_text);
         int remaining = target;
         int remaining_weight = 0;
         for (const auto & c : chunk_texts) remaining_weight += std::max(1, utf8_length(c));
@@ -1472,11 +1474,11 @@ Audio OmniVoiceRuntime::generate(const SynthesisParams & params) {
     {
         ScopedStage stage(model, "postprocess", "postprocess");
         waveform = chunk_wavs.size() == 1 ? chunk_wavs[0] : cross_fade_chunks(chunk_wavs, model.higgs.sample_rate);
-        if (config.postprocess_output) waveform = remove_silence(waveform, model.higgs.sample_rate, 500, 100, 100);
+        if (config.postprocess_output) waveform = remove_silence(waveform, model.higgs.sample_rate, 500, 100, 100, config.output_preserve_active_edges);
         float peak = 0.0f;
         for (float v : waveform) peak = std::max(peak, std::abs(v));
         if (peak > 1.0e-6f) for (float & v : waveform) v = v / peak * 0.5f;
-        waveform = fade_and_pad_audio(waveform, model.higgs.sample_rate);
+        waveform = fade_and_pad_audio(waveform, model.higgs.sample_rate, config.fade_duration, config.pad_duration);
     }
     return Audio{model.higgs.sample_rate, std::move(waveform)};
 }

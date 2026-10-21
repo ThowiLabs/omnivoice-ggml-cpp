@@ -130,10 +130,12 @@ bool contains_cjk(const std::string & text);
 int utf8_length(const std::string & text);
 float text_duration_weight(const std::string & text);
 std::string add_punctuation(const std::string & text);
+std::string normalize_terminal_punctuation_spacing(const std::string & text);
 std::vector<std::string> chunk_text_punctuation(const std::string & text, int chunk_len, int min_chunk_len);
 
-std::vector<float> remove_silence(const std::vector<float> & audio, int sample_rate, int mid_sil_ms, int lead_sil_ms, int trail_sil_ms);
-std::vector<float> fade_and_pad_audio(const std::vector<float> & audio, int sample_rate);
+std::vector<float> remove_silence(const std::vector<float> & audio, int sample_rate, int mid_sil_ms, int lead_sil_ms, int trail_sil_ms, bool preserve_active_edges = false);
+std::vector<float> fade_and_pad_audio(const std::vector<float> & audio, int sample_rate,
+                                      float fade_duration = 0.1f, float pad_duration = 0.1f);
 std::vector<float> cross_fade_chunks(const std::vector<std::vector<float>> & chunks, int sample_rate);
 std::vector<float> resample_linear(const std::vector<float> & input, int src_rate, int dst_rate);
 

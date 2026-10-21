@@ -121,6 +121,8 @@ void usage() {
         << "  --language LANG --instruct TEXT --auto-voice true|false\n"
         << "  --num-step N --guidance-scale F --speed F --duration F --t-shift F\n"
         << "  --denoise true|false --postprocess-output true|false --preprocess-prompt true|false\n"
+        << "  --fade-duration F --pad-duration F --output-preserve-active-edges true|false\n"
+        << "  --normalize-terminal-punctuation true|false\n"
         << "  --layer-penalty-factor F --position-temperature F --class-temperature F\n"
         << "  --device cpu|cuda[:N] --backend cpu|cuda --seed N --threads N\n";
 }
@@ -158,6 +160,10 @@ int main(int argc, char ** argv) {
             else if (key == "--t-shift" || key == "--t_shift") params.generation.t_shift = std::stof(need("--t-shift"));
             else if (key == "--denoise") params.generation.denoise = parse_bool(need("--denoise"));
             else if (key == "--postprocess-output" || key == "--postprocess_output") params.generation.postprocess_output = parse_bool(need("--postprocess-output"));
+            else if (key == "--fade-duration") params.generation.fade_duration = std::stof(need("--fade-duration"));
+            else if (key == "--pad-duration") params.generation.pad_duration = std::stof(need("--pad-duration"));
+            else if (key == "--output-preserve-active-edges") params.generation.output_preserve_active_edges = parse_bool(need("--output-preserve-active-edges"));
+            else if (key == "--normalize-terminal-punctuation") params.generation.normalize_terminal_punctuation = parse_bool(need("--normalize-terminal-punctuation"));
             else if (key == "--preprocess-prompt" || key == "--preprocess_prompt") params.generation.preprocess_prompt = parse_bool(need("--preprocess-prompt"));
             else if (key == "--layer-penalty-factor" || key == "--layer_penalty_factor") params.generation.layer_penalty_factor = std::stof(need("--layer-penalty-factor"));
             else if (key == "--position-temperature" || key == "--position_temperature") params.generation.position_temperature = std::stof(need("--position-temperature"));

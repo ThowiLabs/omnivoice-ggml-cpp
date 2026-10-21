@@ -100,3 +100,14 @@ install(TARGETS omnivoice_ggml_cpp omnivoice-cli omnivoice-server
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
+
+# Optional regression tests for acoustic edge and tokenizer protection.
+# Disabled by default to keep the original lean production builds intact.
+option(OMNIVOICE_BUILD_TESTS "Build C++ speech-edge regression tests" OFF)
+if(OMNIVOICE_BUILD_TESTS)
+    enable_testing()
+    add_executable(test-edge-controls tests/test_edge_controls.cpp)
+    target_include_directories(test-edge-controls PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(test-edge-controls PRIVATE omnivoice_ggml_cpp)
+    add_test(NAME edge-controls COMMAND test-edge-controls)
+endif()

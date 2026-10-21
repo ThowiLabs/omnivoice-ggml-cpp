@@ -19,6 +19,12 @@ struct GenerationConfig {
     bool denoise = true;
     bool preprocess_prompt = true;
     bool postprocess_output = true;
+    // Hangry Labs / official Python parity. Zero fade avoids swallowing weak
+    // final consonants; padding is independent of the fade.
+    float fade_duration = 0.1f;
+    float pad_duration = 0.1f;
+    bool output_preserve_active_edges = false;
+    bool normalize_terminal_punctuation = true;
     float audio_chunk_duration = 15.0f;
     float audio_chunk_threshold = 30.0f;
     std::optional<uint64_t> seed;

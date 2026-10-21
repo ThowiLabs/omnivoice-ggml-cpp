@@ -469,6 +469,14 @@ int main(int argc, char ** argv) {
 
         if (auto v = get_opt_bool(body, "postprocess_output"))
             params.generation.postprocess_output = *v;
+        if (auto v = get_opt_number(body, "fade_duration"))
+            params.generation.fade_duration = static_cast<float>(*v);
+        if (auto v = get_opt_number(body, "pad_duration"))
+            params.generation.pad_duration = static_cast<float>(*v);
+        if (auto v = get_opt_bool(body, "output_preserve_active_edges"))
+            params.generation.output_preserve_active_edges = *v;
+        if (auto v = get_opt_bool(body, "normalize_terminal_punctuation"))
+            params.generation.normalize_terminal_punctuation = *v;
 
         if (auto v = get_opt_number(body, "duration"))
             params.duration = static_cast<float>(*v);
